@@ -3,7 +3,6 @@
 """
 This file contains functions of processing emails
 """
-
 import re
 from html2text import html2text
 
