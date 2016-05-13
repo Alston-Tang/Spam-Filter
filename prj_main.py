@@ -171,11 +171,23 @@ def main():
     print(clf.best_params_)
     print(clf.best_estimator_)
     """
+    """
     lr_model = LogisticRegression(random_state=3)
     penalty = ['l1', 'l2']
     Cs = np.logspace(-4, 2, 200)
     solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag']
     clf = GridSearchCV(lr_model, {'C': Cs, "solver": solver, "penalty": penalty}, n_jobs=-1, cv=cv, error_score=0)
+    clf.fit(x_train_transform, y_train)
+    print(clf.best_score_)
+    print(clf.best_params_)
+    print(clf.best_estimator_)
+    """
+    rf_model = RandomForestClassifier(random_state=10)
+    n_estimators = list(range(1, 20))
+    criterion = ['gini', 'entropy']
+    max_features = np.linspace(0.5, 1, 30)
+    min_weight_fraction_leaf = np.linspace(0, 0.05, 10)
+    clf = GridSearchCV(rf_model, {"n_estimators": n_estimators, "criterion": criterion, "max_features": max_features, "min_weight_fraction_leaf": min_weight_fraction_leaf}, n_jobs=-1, cv=cv, error_score=0)
     clf.fit(x_train_transform, y_train)
     print(clf.best_score_)
     print(clf.best_params_)
