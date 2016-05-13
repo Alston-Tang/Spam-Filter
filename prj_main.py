@@ -6,7 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.cross_validation import StratifiedShuffleSplit
+from sklearn.cross_validation import StratifiedShuffleSplit, train_test_split
 from sklearn.grid_search import GridSearchCV
 from nltk import word_tokenize
 from nltk.stem import PorterStemmer
@@ -15,19 +15,20 @@ import numpy as np
 
 import json
 
-
 load_if_possible = True
 
 
-def save_source(x_train, vocabulary):
+def save_source(x_train, y_train, vocabulary_train, x_test, y_test, vocabulary_test):
     with open("source_data.json", mode="w", encoding="utf-8") as f_out:
-        json.dump({"x_train": x_train.tolist(), "vocabulary": vocabulary}, f_out)
+        json.dump({"x_train": x_train.tolist(), "vocabulary_train": vocabulary_train, "y_train": y_train,
+                   "x_test": x_test.tolist(), "vocabulary_test": vocabulary_test, "y_test": y_test}, f_out)
 
 
 def load_source():
     with open("source_data.json", encoding="utf-8") as f_in:
         source = json.load(f_in)
-        return np.array(source["x_train"]), np.array(source["vocabulary"])
+        return np.array(source["x_train"]), np.array(source["y_train"]), np.array(source["vocabulary_train"]), \
+               np.array(source["x_test"]), np.array(source["y_test"]), np.array(source["vocabulary_test"])
 
 
 def randomize_split(x, y):
@@ -46,7 +47,6 @@ def cal_score(model, xs, ys):
     for i in range(0, len(xs)):
         score.append(model.score(xs[i]["test"], ys[i]["test"]))
     return score
-
 
 
 def get_names(_dir):
@@ -103,6 +103,7 @@ def feature_extraction_with_vocabulary(_mail_list, _voca_file):
 
     return feature_vectors, vocabulary
 
+
 def main():
     train_dir = 'training'
     good_dir = os.path.join(train_dir, 'good')
@@ -121,22 +122,24 @@ def main():
     # process the spams
     training_mails = get_mail_list(spam_mail_names, training_mails)
 
-    ### Get feature matrix Xtrain from the mails
-    try:
-        Xtrain, vocabulary = load_source()
-    except (json.JSONDecodeError, FileNotFoundError):
-        Xtrain, vocabulary = feature_extraction_with_vocabulary(training_mails, vocabulary_file)
-        try:
-            save_source(Xtrain, vocabulary)
-        except Exception:
-            pass
-
     ### Obtain label vector y
     y = np.concatenate([np.ones(len(good_mail_names), dtype=np.int), np.zeros(len(spam_mail_names), dtype=np.int)])
 
-    ### Split data set
+    ### Get feature matrix Xtrain from the mails
+    try:
+        x_train_transform, y_train, vocabulary_train, x_test_transform, y_test, vocabulary_test = load_source()
+    except (json.JSONDecodeError, FileNotFoundError):
+        x_train, x_test, y_train, y_test = train_test_split(training_mails, y, test_size=0.1, random_state=0,
+                                                            stratify=y)
+        x_train_transform, vocabulary_train = feature_extraction_with_vocabulary(x_train, vocabulary_file)
+        x_test_transform, vocabulary_test = feature_extraction_with_vocabulary(x_test, vocabulary_file)
+        try:
+            save_source(x_train_transform, y_train, vocabulary_train, x_test_transform, y_test, vocabulary_test)
+        except Exception:
+            pass
 
-    xs, ys = randomize_split(Xtrain, y)
+    ### Split data set
+    cv = StratifiedShuffleSplit(y_train, 10, test_size=0.1, random_state=1)
 
     ### train your classifiers
 
@@ -159,17 +162,17 @@ def main():
     rf_model.fit_transform(x_train, y_train)
     print("Random Forest: " + str(rf_model.score(x_validate, y_validate)))
     """
-    svm_model = SVC(kernel="poly", C=2)
-    Cs = np.logspace(-1, 1.5, 100)
-    degree = [1, 2, 3, 4, 5]
-    kernel = ['linear', 'poly', 'rbf', 'sigmoid']
-    clf = GridSearchCV(svm_model, {"degree": degree, "C": Cs}, n_jobs=12)
-    clf.fit(xs[0]["train"], ys[0]["train"])
+
+    svm_model = SVC(kernel="linear")
+    Cs = np.logspace(-4, 2, 3000)
+    clf = GridSearchCV(svm_model, {"C": Cs}, n_jobs=-1, cv=cv)
+    clf.fit(x_train_transform, y_train)
     print(clf.best_score_)
     print(clf.best_params_)
     print(clf.best_estimator_)
 
-    pass
+    print(clf.score(x_test_transform, y_test))
+
 
 if __name__ == '__main__':
     main()
