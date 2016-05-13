@@ -20,8 +20,8 @@ load_if_possible = True
 
 def save_source(x_train, y_train, vocabulary_train, x_test, y_test, vocabulary_test):
     with open("source_data.json", mode="w", encoding="utf-8") as f_out:
-        json.dump({"x_train": x_train.tolist(), "vocabulary_train": vocabulary_train, "y_train": y_train,
-                   "x_test": x_test.tolist(), "vocabulary_test": vocabulary_test, "y_test": y_test}, f_out)
+        json.dump({"x_train": x_train.tolist(), "vocabulary_train": vocabulary_train, "y_train": y_train.tolist(),
+                   "x_test": x_test.tolist(), "vocabulary_test": vocabulary_test, "y_test": y_test.tolist()}, f_out)
 
 
 def load_source():
@@ -128,7 +128,7 @@ def main():
     ### Get feature matrix Xtrain from the mails
     try:
         x_train_transform, y_train, vocabulary_train, x_test_transform, y_test, vocabulary_test = load_source()
-    except (json.JSONDecodeError, FileNotFoundError):
+    except (ValueError, FileNotFoundError):
         x_train, x_test, y_train, y_test = train_test_split(training_mails, y, test_size=0.1, random_state=0,
                                                             stratify=y)
         x_train_transform, vocabulary_train = feature_extraction_with_vocabulary(x_train, vocabulary_file)
@@ -162,7 +162,7 @@ def main():
     rf_model.fit_transform(x_train, y_train)
     print("Random Forest: " + str(rf_model.score(x_validate, y_validate)))
     """
-
+    """
     svm_model = SVC(kernel="linear")
     Cs = np.logspace(-4, 2, 3000)
     clf = GridSearchCV(svm_model, {"C": Cs}, n_jobs=-1, cv=cv)
@@ -170,7 +170,16 @@ def main():
     print(clf.best_score_)
     print(clf.best_params_)
     print(clf.best_estimator_)
-
+    """
+    lr_model = LogisticRegression(random_state=3)
+    penalty = ['l1', 'l2']
+    Cs = np.logspace(-4, 2, 200)
+    solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag']
+    clf = GridSearchCV(lr_model, {'C': Cs, "solver": solver, "penalty": penalty}, n_jobs=-1, cv=cv, error_score=0)
+    clf.fit(x_train_transform, y_train)
+    print(clf.best_score_)
+    print(clf.best_params_)
+    print(clf.best_estimator_)
     print(clf.score(x_test_transform, y_test))
 
 
